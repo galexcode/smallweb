@@ -1,4 +1,4 @@
-web (1.0-2.1) unstable; urgency=low
+smallweb (1.0-2.1) unstable; urgency=low
 
   [ Ralph Glass ]
   * Initial release.
