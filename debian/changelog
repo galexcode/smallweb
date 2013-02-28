@@ -1,0 +1,9 @@
+web (1.0-2.1) unstable; urgency=low
+
+  [ Ralph Glass ]
+  * Initial release.
+
+  [ "Super" Nathan Weber ]
+  * changed web address
+
+ -- "Super" Nathan Weber <supernathansunshine@gmail.com>  Fri, 01 Mar 2013 06:42:41 +0900
