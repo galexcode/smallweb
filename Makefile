@@ -14,7 +14,7 @@ remove:
 	sudo rm $(prefix)/share/pixmaps/minimalwebbrowser.png
 
 clean:
-	rm ./web
+	rm ./smallweb
 
 tar: web.c Makefile
 	cd .. && tar -czvf web_1.0.orig.tar.gz ./web-1.0/Makefile ./web-1.0/web.c ./web-1.0/COPYING ./web-1.0/minimalwebbrowser.png ./web-1.0/web.desktop
