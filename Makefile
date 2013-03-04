@@ -3,7 +3,7 @@ prefix=/usr
 game: smallweb.c
 	gcc smallweb.c -o smallweb `pkg-config --cflags gtk+-2.0 --libs webkit-1.0`
 
-install: web
+install: smallweb
 	sudo install -g dialout smallweb $(prefix)/bin
 	sudo cp ./smallweb.desktop $(prefix)/share/applications/smallweb.desktop
 	sudo cp ./minimalwebbrowser.png $(prefix)/share/pixmaps/minimalwebbrowser.png
