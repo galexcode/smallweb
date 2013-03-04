@@ -1,11 +1,11 @@
 prefix=/usr
 
-game: web.c
-	gcc web.c -o smallweb `pkg-config --cflags gtk+-2.0 --libs webkit-1.0`
+game: smallweb.c
+	gcc smallweb.c -o smallweb `pkg-config --cflags gtk+-2.0 --libs webkit-1.0`
 
 install: web
 	sudo install -g dialout smallweb $(prefix)/bin
-	sudo cp ./web.desktop $(prefix)/share/applications/web.desktop
+	sudo cp ./smallweb.desktop $(prefix)/share/applications/smallweb.desktop
 	sudo cp ./minimalwebbrowser.png $(prefix)/share/pixmaps/minimalwebbrowser.png
 
 remove: 
@@ -16,13 +16,13 @@ remove:
 clean:
 	rm ./smallweb
 
-tar: web.c Makefile
-	cd .. && tar -czvf web_1.0.orig.tar.gz ./web-1.0/Makefile ./web-1.0/web.c ./web-1.0/COPYING ./web-1.0/minimalwebbrowser.png ./web-1.0/web.desktop
+tar: smallweb.c Makefile
+	cd .. && tar -czvf smallweb_1.0.orig.tar.gz ./smallweb-1.0/Makefile ./smallweb-1.0/smallweb.c ./smallweb-1.0/COPYING ./smallweb-1.0/minimalwebbrowser.png ./smallweb-1.0/smallweb.desktop
 
 deb: smallweb
 	debuild -us -uc	
 
 install-deb: smallweb_1.0-2_armhf.deb
-	sudo dpkg -i ../web_1.0-2_armhf.deb
+	sudo dpkg -i ../smallweb_1.0-2_armhf.deb
 	
 
