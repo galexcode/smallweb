@@ -141,7 +141,7 @@ int main( int argc, char* argv[] )
     if (!argv[1] == 0)
         webkit_web_view_load_uri( webView, argv[1] );
     else
-        webkit_web_view_load_uri( webView, "http://www.google.com" );
+        webkit_web_view_load_uri( webView, "http://www.pibanglinux.org" );
 
     gtk_widget_grab_focus( GTK_WIDGET( webView ) );
     gtk_widget_show_all( main_window );
