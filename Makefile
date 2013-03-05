@@ -22,7 +22,7 @@ tar: smallweb.c Makefile
 deb: smallweb
 	debuild -us -uc	
 
-install-deb: smallweb_1.0-2_armhf.deb
-	sudo dpkg -i ../smallweb_1.0-2_armhf.deb
+install-deb: smallweb_1.0*_armhf.deb
+	sudo dpkg -i ../smallweb_1.0*_armhf.deb
 	
 
