@@ -10,7 +10,7 @@ install: smallweb
 
 remove: 
 	sudo rm $(prefix)/bin/smallweb
-	sudo rm $(prefix)/share/applications/web.desktop
+	sudo rm $(prefix)/share/applications/smallweb.desktop
 	sudo rm $(prefix)/share/pixmaps/minimalwebbrowser.png
 
 clean:
