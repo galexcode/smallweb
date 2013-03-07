@@ -1,0 +1,3 @@
+#!/bin/bash
+rm /usr/bin/smallweb
+exit 0
