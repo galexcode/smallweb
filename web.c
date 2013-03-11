@@ -20,20 +20,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* G_CALLBACK(functions) */
+static int               window_count = 0;
+static gboolean          javascript = FALSE;
+static WebKitWebSettings *settings;
 
-static void hoveringOverLink( WebKitWebView* webView ,
-                              gchar*         title ,
-                              gchar*         uri ,
-                              gchar*         uriEntry )
-{
-        if (!(uri==NULL)){
-                gtk_entry_set_text( GTK_ENTRY( uriEntry ), uri );}
-}
+/* G_CALLBACK(functions) */
 
 static void destroy( GtkWidget* widget, GtkWidget* window )
 {
-        gtk_main_quit();
+        if (window_count < 2)
+                gtk_main_quit();
+        window_count--;
 }
 
 static void closeView( WebKitWebView* webView, GtkWidget* window )
@@ -52,19 +49,19 @@ static void goHome( GtkWidget* window, WebKitWebView* webView )
         webkit_web_view_load_uri( webView, "http://www.pibanglinux.org" ); 
 }
 
-static void downloadRequested( WebKitWebView*   webView ,
-                                WebKitDownload* download ,
-                                GtkEntry*       user_data_entry )
+static void downloadRequested( WebKitWebView*  webView,
+                               WebKitDownload* download, 
+                               GtkEntry*       user_data_entry )
 {
-        const char* uri = gtk_entry_get_text( user_data_entry );
+        const char* uri = webkit_download_get_uri( download);
         const char* homedir = getenv("HOME");
-        const char* downloaddir = g_strjoin( NULL ,   
-                                             "--directory-prefix=" ,
-                                             homedir , 
-                                             "/Downloads" , 
+        const char* downloaddir = g_strjoin( NULL,   
+                                             "--directory-prefix=",
+                                             homedir, 
+                                             "/Downloads", 
                                              NULL );
         /* fork download with wget */
-        int r= 0;
+        int r = 0;
         r = fork();
         if (r>0) {
                 execl( "/usr/bin/wget", "wget", downloaddir, // download directory
@@ -75,17 +72,22 @@ static void downloadRequested( WebKitWebView*   webView ,
                                                 NULL); };
 }
 
-static void searchText( WebKitWebView* webView,
-                        gchar*         searchString )
+static void searchText( WebKitWebView* webView, gchar* searchString )
 {
-        
         webkit_web_view_unmark_text_matches( webView );
         webkit_web_view_search_text( webView, searchString, false, true, true );
         webkit_web_view_mark_text_matches( webView, searchString, false, 0 );
         webkit_web_view_set_highlight_text_matches( webView, true );
 }
 
-static void activateEntry( GtkWidget* entry, gpointer gdata )
+static void toggleJavascript( GtkWidget* window , WebKitWebView* webView )
+{
+        javascript=!javascript;
+        g_object_set (G_OBJECT(settings), "enable-scripts", javascript , NULL);
+        webkit_web_view_reload( webView );
+}
+
+static void activateEntry( GtkWidget* entry, gpointer* gdata )
 {
         WebKitWebView* webView = g_object_get_data( G_OBJECT( entry ), "webView" );
         const gchar* entry_str = gtk_entry_get_text( GTK_ENTRY( entry ));
@@ -106,33 +108,56 @@ static void activateEntry( GtkWidget* entry, gpointer gdata )
                                     g_strjoin( NULL, search_str, entry_str, NULL ));
         }
         const gchar* uri = gtk_entry_get_text( GTK_ENTRY( entry ));
-        g_assert( uri );
-        g_assert( webView );
         webkit_web_view_load_uri( webView, uri );
 }
 
-static WebKitWebView* createWebView ( WebKitWebView*  webView,
-                                      WebKitWebFrame* frame,
-                                      GtkEntry*       uriEntry)
+static gboolean navigationPolicyDecision( WebKitWebView*             webView,
+                                          WebKitWebFrame*            frame,
+                                          WebKitNetworkRequest*      request,
+                                          WebKitWebNavigationAction* action,
+                                          WebKitWebPolicyDecision*   decision,
+                                          GtkEntry*                  entry )
 {
-        const char* user_data;
-        user_data = gtk_entry_get_text( uriEntry );
-        /* fork new browser */
-        int r = 0;
-        r = fork();
-        if ( r > 0 ) {
-                execl( "/usr/bin/web", "web" , user_data , "&" , NULL ); }
-        else {
-                return NULL; }
+        gtk_entry_set_text(entry, webkit_network_request_get_uri(request));
+        return FALSE;
 }
 
-/* main */
-
-int main( int argc, char* argv[] )
+static gboolean mimePolicyDecision( WebKitWebView*           webView,
+                                    WebKitWebFrame*          frame,
+                                    WebKitNetworkRequest*    request,
+                                    gchar*                   mimetype,
+                                    WebKitWebPolicyDecision* policy_decision,
+                                    gpointer*                user_data)
 {
-        gtk_init( &argc, &argv );
+        //g_print("mimetype: %s \n", mimetype);
+        if ((strncmp(mimetype, "video/mp4", 9) == 0) ||
+            (strncmp(mimetype, "application/octet-stream", 24) == 0)) {        
+                //g_print("video detected!\n");
+                const char* command = g_strjoin( NULL,
+                                                 "web-omxplayer.sh ", 
+                                                 webkit_network_request_get_uri(request),
+                                                 NULL );
+                /* fork omxplayer */
+                int r = 0;
+                r = fork();
+                if (r>0) {  
+                        g_print("\nstarting omxplayer ...\n");
+                        g_print("%s\n", command); 
+                        execl("/usr/bin/xterm","xterm","-fullscreen", "-bg", "black", "-e", command, NULL); 
+                        return TRUE;
+                } else { 
+                        webkit_web_policy_decision_ignore(policy_decision);
+                        return TRUE;}
+        }
+        return FALSE;
+}
 
-        GtkWidget*     main_window = gtk_window_new( GTK_WINDOW_TOPLEVEL );
+static WebKitWebView* createWebView ( WebKitWebView*  parentWebView,
+                                      WebKitWebFrame* frame,
+                                      char*           arg)
+{
+        window_count++;
+        GtkWidget*     window = gtk_window_new( GTK_WINDOW_TOPLEVEL );
         GtkWidget*     vbox = gtk_vbox_new( FALSE, 0 );
         GtkWidget*     scrolledWindow = gtk_scrolled_window_new( NULL, NULL );
         GtkWidget*     uriEntry = gtk_entry_new();
@@ -140,39 +165,65 @@ int main( int argc, char* argv[] )
         GtkToolItem*   item;
         WebKitWebView* webView = WEBKIT_WEB_VIEW( webkit_web_view_new() );
 
-        gtk_entry_set_text( GTK_ENTRY( uriEntry ), "http://" );
+        g_object_set (G_OBJECT(settings), "enable-scripts", javascript, NULL); 
+        g_object_set (G_OBJECT(settings), "enable-private-browsing", TRUE, NULL);
+        webkit_web_view_set_settings( WEBKIT_WEB_VIEW(webView), settings);
+
+        if (arg != NULL)
+                gtk_entry_set_text( GTK_ENTRY( uriEntry ), arg );
+        else
+                gtk_entry_set_text( GTK_ENTRY( uriEntry ), "http://" );
 
         item = gtk_tool_button_new_from_stock( GTK_STOCK_GO_BACK );
+        gtk_tool_button_set_label(GTK_TOOL_BUTTON( item ), "Back" );
         gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
         g_signal_connect( G_OBJECT( item ), "clicked", G_CALLBACK( goBack ), webView );
 
         item = gtk_tool_button_new_from_stock( GTK_STOCK_HOME );
         gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
+        gtk_tool_button_set_label(GTK_TOOL_BUTTON( item ), "Home" );
         g_signal_connect( G_OBJECT( item ), "clicked", G_CALLBACK( goHome ), webView );
 
-        gtk_window_set_default_size( GTK_WINDOW( main_window ), 1024, 768 );
+        item = gtk_toggle_tool_button_new_from_stock( GTK_STOCK_PROPERTIES );
+        gtk_tool_button_set_label(GTK_TOOL_BUTTON( item ), "Javascript" );
+        gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1);
+        gtk_toggle_tool_button_set_active( GTK_TOGGLE_TOOL_BUTTON( item ), javascript );
+        g_signal_connect( G_OBJECT( item ), "toggled", G_CALLBACK( toggleJavascript ), webView );
+
+        gtk_window_set_default_size( GTK_WINDOW( window ), 1024, 768 );
         g_object_set_data( G_OBJECT( uriEntry ), "webView", webView );
 
         gtk_container_add(  GTK_CONTAINER( scrolledWindow ), GTK_WIDGET( webView ) );
         gtk_box_pack_start( GTK_BOX( vbox ), toolbar, FALSE, FALSE, 0 );
         gtk_box_pack_start( GTK_BOX( vbox ), uriEntry, FALSE, FALSE, 0 );
         gtk_box_pack_start( GTK_BOX( vbox ), scrolledWindow, TRUE, TRUE, 0 );
-        gtk_container_add(  GTK_CONTAINER( main_window ), vbox );
+        gtk_container_add(  GTK_CONTAINER( window ), vbox );
 
-        g_signal_connect( main_window, "destroy",             G_CALLBACK( destroy ),            NULL );
-        g_signal_connect( webView ,    "close-web-view",      G_CALLBACK( closeView ),          main_window );
-        g_signal_connect( uriEntry,    "activate",            G_CALLBACK( activateEntry ),      NULL );
-        g_signal_connect( webView ,    "create-web-view",     G_CALLBACK( createWebView ),      uriEntry );
-        g_signal_connect( webView ,    "hovering_over_link",  G_CALLBACK( hoveringOverLink ),   uriEntry );
-        g_signal_connect( webView ,    "download-requested" , G_CALLBACK( downloadRequested ), uriEntry );
-
-        if (!argv[1] == 0)
-                webkit_web_view_load_uri( webView, argv[1] );
-        else
+        g_signal_connect( window,   "destroy",             G_CALLBACK( destroy ),            window);
+        g_signal_connect( webView,  "close-web-view",      G_CALLBACK( closeView ),          window);
+        g_signal_connect( uriEntry, "activate",            G_CALLBACK( activateEntry ),      NULL);
+        g_signal_connect( webView,  "create-web-view",     G_CALLBACK( createWebView ),      uriEntry);
+        g_signal_connect( webView,  "download-requested" , G_CALLBACK( downloadRequested ),  uriEntry);
+        g_signal_connect( webView,  "navigation-policy-decision-requested",
+                                                           G_CALLBACK( navigationPolicyDecision ), uriEntry);
+        g_signal_connect( webView,  "mime-type-policy-decision-requested",
+                                                           G_CALLBACK( mimePolicyDecision ), NULL);
+        if (arg == NULL)
                 webkit_web_view_load_uri( webView, "http://www.pibanglinux.org" );
-
         gtk_widget_grab_focus( GTK_WIDGET( webView ) );
-        gtk_widget_show_all( main_window );
+        gtk_widget_show_all( window );
+        if (arg != NULL)
+                gtk_widget_activate( uriEntry );
+        return webView;
+}
+
+/* main */
+
+int main( int argc, char* argv[] )
+{
+        gtk_init( &argc, &argv );
+        settings = webkit_web_settings_new();
+        createWebView( NULL, NULL, argv[1] );
         gtk_main();
         return 0;
 }
